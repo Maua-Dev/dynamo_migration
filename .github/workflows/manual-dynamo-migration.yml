@@ -1,0 +1,43 @@
+name: Manual DynamoDB Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Destination environment (dev, homolog, prod)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - homolog
+          - prod
+      table_type:
+        description: 'Type of table to migrate'
+        required: true
+        type: choice
+        options:
+          - member
+          - action
+
+permissions:
+  id-token: write 
+  contents: read  
+
+jobs:
+  migrate-dynamodb-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Set Environment Variables
+        id: set_vars
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "dev" ]]; then
+            echo "destination_role_arn=${{ secrets.AWS_DESTINATION_DEV_ROLE_ARN }}" >> $GITHUB_ENV
+            echo "region=sa-east-1" >> $GITHUB_ENV
+            if [[ "${{ github.event.inputs.table_type }}" == "member" ]]; then
+              echo "source_table=PortalInternoActionStackdev-PortalInternoDynamoPortalInternomemberTable52190F11-1O0RLXQZ8OFNB" >> $GITHUB_ENV
+            else
+              echo "source_table=PortalInternoActionStackdev-PortalInternoDynamoPortalInternoactionTable584366E7-1Q6XJQQPPPZKX" >> $GITHUB_ENV
+            fi
+          elif [[ "${{ github.event.inputs.environment }}" == "homolog" ]]; then
+            echo "destination_role
