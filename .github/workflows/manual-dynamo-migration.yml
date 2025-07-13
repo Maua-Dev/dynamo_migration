@@ -20,8 +20,8 @@ on:
           - action
 
 permissions:
-  id-token: write 
-  contents: read  
+  id-token: write # Required for OIDC authentication
+  contents: read  # Required to check out the code
 
 jobs:
   migrate-dynamodb-data:
@@ -40,4 +40,45 @@ jobs:
               echo "source_table=PortalInternoActionStackdev-PortalInternoDynamoPortalInternoactionTable584366E7-1Q6XJQQPPPZKX" >> $GITHUB_ENV
             fi
           elif [[ "${{ github.event.inputs.environment }}" == "homolog" ]]; then
-            echo "destination_role
+            echo "destination_role_arn=${{ secrets.AWS_DESTINATION_HOMOLOG_ROLE_ARN }}" >> $GITHUB_ENV
+            echo "region=us-east-2" >> $GITHUB_ENV
+            if [[ "${{ github.event.inputs.table_type }}" == "member" ]]; then
+              echo "source_table=PortalInternoActionStackhomolog-PortalInternoDynamoPortalInternomemberTable52190F11-B0323F18DLIY" >> $GITHUB_ENV
+            else
+              echo "source_table=PortalInternoActionStackhomolog-PortalInternoDynamoPortalInternoactionTable584366E7-1BHB64UJN1L9B" >> $GITHUB_ENV
+            fi
+          elif [[ "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "destination_role_arn=${{ secrets.AWS_DESTINATION_PROD_ROLE_ARN }}" >> $GITHUB_ENV
+            echo "region=us-east-1" >> $GITHUB_ENV
+            if [[ "${{ github.event.inputs.table_type }}" == "member" ]]; then
+              echo "source_table=PortalInternoActionStackprod-PortalInternoDynamoPortalInternomemberTable52190F11-3Z0EMUTX3SKZ" >> $GITHUB_ENV
+            else
+              echo "source_table=PortalInternoActionStackprod-PortalInternoDynamoPortalInternoactionTable584366E7-1803UZMAGMQ6B" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.destination_role_arn }}
+          aws-region: ${{ env.region }}
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install boto3
+
+      - name: Run Migration Script
+        env:
+          AWS_SOURCE_REGION: ${{ env.region }}
+          AWS_DESTINATION_REGION: ${{ env.region }}
+          SOURCE_TABLE: ${{ env.source_table }}
+          DESTINATION_TABLE: ${{ env.source_table }} # Assuming the table name is the same in the new account
+          SOURCE_ROLE_ARN: ${{ secrets.AWS_SOURCE_ROLE_ARN }}
+        run: python scripts/migrate_dynamo.py
